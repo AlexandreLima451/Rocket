@@ -1,0 +1,10 @@
+{
+  "textToRemoveFilename": "cert",
+  "shouldSendEmail": true,
+  "shouldSendReport": true,
+  "shouldDeleteFilesAfterProcess": true,
+  "emailAddressSender": "felipe@gmail.com",
+  "passwordEmailSender": "",
+  "emailAddressRecipient": "",
+  "quantityFilesPerPackage": 60
+}
