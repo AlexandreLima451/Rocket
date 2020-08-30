@@ -1,6 +1,6 @@
 package com.company.configuration
 
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import org.json.simple.JSONObject
 import org.json.simple.parser.JSONParser
 import java.io.FileNotFoundException
@@ -10,61 +10,87 @@ import java.io.IOException
 import java.text.ParseException
 
 private const val CONFIGURATION_FILE = "config.json"
+
 class RocketConfiguration {
 
     var textToRemoveFilename: String = ""
+    var zipFilePath: String = ""
     var shouldSendEmail: Boolean = false
     var shouldSendReport: Boolean = false
     var shouldDeleteFilesAfterProcess = false
     var emailAddressSender: String = ""
     var passwordEmailSender: String = ""
     var emailAddressRecipient: String = ""
-    var quantityFilesPerPackage: Int = 20
+    var quantityFilesPerPackage: Int = 50
+    var emailSubject: String = ""
 
-    fun updateTextToRemoveFileName(text: String) {
+    fun updateEmailSubject(subject: String): RocketConfiguration {
+        this.emailSubject = subject
+        updateConfigFile()
+        return this
+    }
+
+    fun updateTextToRemoveFileName(text: String): RocketConfiguration {
         this.textToRemoveFilename = text
         updateConfigFile()
+        return this
     }
 
-    fun updateShouldSendEmail(sendEmail: Boolean) {
+    fun updateZipFilePath(filepath: String): RocketConfiguration {
+        this.zipFilePath = filepath
+        updateConfigFile()
+        return this
+    }
+
+    fun updateShouldSendEmail(sendEmail: Boolean): RocketConfiguration {
         this.shouldSendEmail = sendEmail
         updateConfigFile()
+        return this
     }
 
-    fun updateShouldSendReport(sendReport: Boolean) {
+    fun updateShouldSendReport(sendReport: Boolean): RocketConfiguration {
         this.shouldSendReport = sendReport
         updateConfigFile()
+        return this
     }
 
-    fun updateShouldDeleteFilesAfterProcess(shouldDelete: Boolean) {
+    fun updateShouldDeleteFilesAfterProcess(shouldDelete: Boolean): RocketConfiguration {
         this.shouldDeleteFilesAfterProcess = shouldDelete
         updateConfigFile()
+        return this
     }
 
-    fun updateEmailAddressSender(emailAddress: String) {
+    fun updateEmailAddressSender(emailAddress: String): RocketConfiguration {
         this.emailAddressSender = emailAddress
         updateConfigFile()
+        return this
     }
 
-    fun updatePasswordEmailSender(password: String) {
+    fun updatePasswordEmailSender(password: String): RocketConfiguration {
         this.passwordEmailSender = password
         updateConfigFile()
+        return this
     }
 
-    fun updateEmailAddressRecipient(emailAddress: String) {
+    fun updateEmailAddressRecipient(emailAddress: String): RocketConfiguration {
         this.emailAddressRecipient = emailAddress
         updateConfigFile()
+        return this
     }
 
-    fun updateQuantityFilesPerPackage(quantity: Int) {
+    fun updateQuantityFilesPerPackage(quantity: Int): RocketConfiguration {
         this.quantityFilesPerPackage = quantity
         updateConfigFile()
+        return this
     }
 
     private fun updateConfigFile() {
         try {
             FileWriter(CONFIGURATION_FILE).use { file ->
-                val jsonString = Gson().toJson(this, RocketConfiguration::class.java).toString()
+                val jsonString = GsonBuilder()
+                        .setPrettyPrinting()
+                        .create()
+                        .toJson(this, RocketConfiguration::class.java).toString()
                 file.write(jsonString)
                 file.flush()
             }
@@ -79,7 +105,13 @@ class RocketConfiguration {
                 val jsonParser = JSONParser()
                 val reader = FileReader(CONFIGURATION_FILE)
                 val jsonString: JSONObject = jsonParser.parse(reader) as JSONObject
-                return Gson().fromJson<RocketConfiguration>(jsonString.toJSONString(), RocketConfiguration::class.java)
+                return GsonBuilder()
+                        .setPrettyPrinting()
+                        .create()
+                        .fromJson<RocketConfiguration>(
+                                jsonString.toJSONString(),
+                                RocketConfiguration::class.java
+                        )
             } catch (e: FileNotFoundException) {
                 e.printStackTrace()
             } catch (e: IOException) {

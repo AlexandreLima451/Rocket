@@ -1,10 +1,12 @@
 {
-  "textToRemoveFilename": "cert",
+  "textToRemoveFilename": "teste",
+  "zipFilePath": "/Users/felipe.lima/Desktop/Arquivo Comprimido.zip",
   "shouldSendEmail": true,
   "shouldSendReport": true,
   "shouldDeleteFilesAfterProcess": true,
   "emailAddressSender": "felipe@gmail.com",
   "passwordEmailSender": "",
-  "emailAddressRecipient": "",
-  "quantityFilesPerPackage": 60
+  "emailAddressRecipient": "teste",
+  "quantityFilesPerPackage": 2,
+  "emailSubject": "teste"
 }
