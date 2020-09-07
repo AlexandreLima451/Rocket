@@ -1,6 +1,7 @@
 package com.company.view
 
 import com.company.configuration.RocketConfiguration
+import com.company.util.EmailManager
 import com.company.view.custom.ZipFilePicker
 import java.awt.Container
 import java.awt.Dimension
@@ -9,7 +10,6 @@ import java.awt.Point
 import java.awt.event.ActionEvent
 import java.awt.event.ActionListener
 import javax.swing.*
-
 
 private const val START_X_FIRST_COLUMN = 50
 internal class MyFrame : JFrame(), ActionListener {
@@ -23,6 +23,7 @@ internal class MyFrame : JFrame(), ActionListener {
     private val title: JLabel
 
     init {
+
         setTitle("Rocket")
         setBounds(300, 90, 560, 600)
         defaultCloseOperation = EXIT_ON_CLOSE
@@ -177,7 +178,6 @@ internal class MyFrame : JFrame(), ActionListener {
                                 .updateEmailAddressRecipient(sentEmailTextField.text)
                                 .updateTextToRemoveFileName(removeTextFromFilename.text)
                                 .updateQuantityFilesPerPackage(quantityFilesTextField.value as Int)
-
                     }
                 }
 
