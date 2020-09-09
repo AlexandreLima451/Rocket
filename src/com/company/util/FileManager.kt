@@ -1,14 +1,15 @@
 package com.company.util
 
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
+import com.company.configuration.RocketConfiguration
+import java.io.*
 import java.time.LocalDateTime
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-
+/**
+ * Class that is responsible to manage files
+ */
 class FileManager {
 
     /**
@@ -63,9 +64,9 @@ class FileManager {
      * @param mSourcePath is the folder that will be compacted
      * @param mDestPath is the final folder where the .zip folder will be found
      * @param mZipFileName is the name of .zip file
-     * @return the final result of the process
+     * @return the absolute path of zip file
      */
-    private fun compactFolder(mSourcePath: String, mDestPath: String, mZipFileName : String) : String{
+    private fun zipFolder(mSourcePath: String, mDestPath: String, mZipFileName : String) : String{
 
         val buffer = ByteArray(1024)
         val sourceDirectory = File(mSourcePath)
@@ -75,7 +76,9 @@ class FileManager {
             return "The source path $mSourcePath is not a directory!"
         }
 
-        val fileOut = FileOutputStream("$mDestPath/$zipFileNameWithoutExtension.zip")
+        val absolutePathOfZip = "$mDestPath/$zipFileNameWithoutExtension.zip"
+
+        val fileOut = FileOutputStream(absolutePathOfZip)
         val zipOut = ZipOutputStream(fileOut)
 
         try {
@@ -96,7 +99,6 @@ class FileManager {
                 }
             }
 
-
             zipOut.closeEntry()
 
         }catch (ioException : IOException){
@@ -108,69 +110,160 @@ class FileManager {
                 ex.printStackTrace()
             }
         }
-        return MESSAGE_SUCCESS
+        return absolutePathOfZip
     }
+
+    /**
+     * method that extracts all files inside of a zip
+     * @param mSourcePath is the folder that will be unzip
+     * @param mDestPath is the final folder where the files will be found after unzip
+     * @return a list of files that were extracted
+     */
+    fun unzipFolder(mSourcePath : String, mDestPath : String) : List<FileData> {
+        val buffer = 1024
+
+        try{
+            val fileInputStream = FileInputStream(mSourcePath)
+            val zipInputStream = ZipInputStream(BufferedInputStream(fileInputStream))
+            var zipEntry : ZipEntry?
+
+            var fileOutputStream : FileOutputStream
+            var dest : BufferedOutputStream
+            var fileId = 0
+            val listOfFileData = ArrayList<FileData>()
+
+            zipEntry = zipInputStream.nextEntry
+
+            if(zipEntry != null) {
+                var absoluteDestPath = mDestPath + File.separator + zipEntry.name
+                fileOutputStream = FileOutputStream(absoluteDestPath)
+                dest = BufferedOutputStream(fileOutputStream, buffer)
+
+                while (zipEntry?.name != null) {
+
+                    if (zipEntry.name != null) {
+                        var count: Int
+                        val data = ByteArray(buffer)
+
+                        count = zipInputStream.read(data, 0, buffer)
+                        while (count > 0) {
+                            dest.write(data, 0, count)
+                            count -= buffer
+                        }
+
+                        dest.flush()
+
+                        fileId++
+                        listOfFileData.add(FileData(fileId, absoluteDestPath, ArrayList()))
+
+                        zipEntry = zipInputStream.nextEntry
+
+                        if (zipEntry != null) {
+                            absoluteDestPath = mDestPath + File.separator + zipEntry.name
+                            fileOutputStream = FileOutputStream(absoluteDestPath)
+                            dest = BufferedOutputStream(fileOutputStream, buffer)
+                        }
+                    } else {
+                        break
+                    }
+                }
+                dest.close()
+                zipInputStream.close()
+            }
+
+            return listOfFileData
+        }catch (exc : IOException){
+            exc.printStackTrace()
+            return ArrayList()
+        }
+    }
+
+    /**
+     * method that list all files of a folder
+     * @param mSourcePath is the folder that will scanned
+     * @return a list of files
+     */
+    private fun listFilesByFolder(mSourcePath : String) : List<String> {
+        val listOfFiles = ArrayList<String>()
+
+        return try{
+            val files = File(mSourcePath)
+
+            files.listFiles()?.forEach {
+                listOfFiles.add(it.name)
+            }
+
+            listOfFiles
+        }catch (exc : IOException){
+            exc.printStackTrace()
+            ArrayList()
+        }
+    }
+
 
     /**
      * the method that splits all files according the parameters
      * @param mSourcePath is the source's path of the files that will be split.
      * @param mDestPath is the destiny's path that all folders .
      * @param mFileExtension is the extension of the files that will be split
-     * @param mRemoveFromName is the text that will be removed from original files' name
-     * @param mQuantityOfFilesByFolder is the number of files by folder
      * @param mIsZipFolder indicates if folder will be zipped or not
-     * @return the result of process
+     * @return a list of files;
      */
     fun splitFiles(mSourcePath: String,
                    mDestPath: String,
-                   mFileExtension: String?,
-                   mRemoveFromName: String?,
-                   mQuantityOfFilesByFolder: Int,
-                   mIsZipFolder : Boolean): String {
+                   mFileExtension: String = ".rtf",
+                   mIsZipFolder : Boolean = true): List<FileData> {
+
+        val configuration = RocketConfiguration.instance()
         val folder = File(mSourcePath.trim())
-        val files = folder.listFiles() ?: return MESSAGE_NOT_FOUND
+        val files = folder.listFiles() ?: return ArrayList()
         var count = 0
         val rootFolderName = "rocket " + LocalDateTime.now()
         var currentFolderName = DEFAULT_FOLDER_NAME
+        val listOfFileData = ArrayList<FileData>()
 
         val destinyFolder = createFolder(mPath = mDestPath, mNewFolderName = rootFolderName)
 
         var destPathFolder = createFolder(destinyFolder.trim(), currentFolderName)
         for (file in files) {
-            val fileName = file.name.replace(mRemoveFromName!!, "")
+            val fileName = file.name.replace(configuration.textToRemoveFilename, "")
             val destFilePath = destPathFolder + File.separator + fileName
-            if (file.name.contains(mFileExtension!!)) {
+            if (file.name.contains(mFileExtension)) {
                 val wasFileMoved = moveTo(file.absolutePath, destFilePath)
                 if (wasFileMoved) {
                     count++
-                    if (count >= mQuantityOfFilesByFolder) {
+                    if (count >= configuration.quantityFilesPerPackage) {
 
                         currentFolderName = (currentFolderName.toInt() + 1).toString()
                         destPathFolder = createFolder(destinyFolder.trim(), currentFolderName)
                         count = 0
                     }
                 } else {
-                    return MESSAGE_ERROR_MOVING_FILE
+                    return ArrayList()
                 }
             }
         }
+
+        var fileId = 0
 
         if(mIsZipFolder){
             File(destinyFolder).listFiles()?.forEach {
                 if(it.isDirectory){
-                    compactFolder(mSourcePath = it.absolutePath, mDestPath = destinyFolder, mZipFileName = it.name)
+                    val listFilesByFolder = listFilesByFolder(it.absolutePath)
+                    val absolutePathOfZipFile = zipFolder(mSourcePath = it.absolutePath, mDestPath = destinyFolder, mZipFileName = it.name)
                     deleteFolder(mFolderPath = it.absolutePath)
+                    fileId++
+                    listOfFileData.add(FileData(fileId, absolutePathOfZipFile, listFilesByFolder))
+
                 }
             }
         }
 
-        return MESSAGE_SUCCESS
+        return listOfFileData
     }
 
     companion object {
         private const val DEFAULT_FOLDER_NAME = "1"
-        private const val MESSAGE_NOT_FOUND = "No files found"
         private const val MESSAGE_SUCCESS = "OK"
-        private const val MESSAGE_ERROR_MOVING_FILE = "It is not able to move FILE to destination."
     }
 }
