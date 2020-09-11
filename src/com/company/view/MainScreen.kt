@@ -1,18 +1,26 @@
 package com.company.view
 
 import com.company.configuration.RocketConfiguration
-import com.company.util.EmailManager
+import com.company.util.Logger
+import com.company.util.ProcessorManager
 import com.company.view.custom.ZipFilePicker
+import io.reactivex.Observer
+import io.reactivex.disposables.Disposable
 import java.awt.Container
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.Point
 import java.awt.event.ActionEvent
 import java.awt.event.ActionListener
+import java.awt.event.AdjustmentEvent
+import java.awt.event.AdjustmentListener
 import javax.swing.*
 
 private const val START_X_FIRST_COLUMN = 50
-internal class MyFrame : JFrame(), ActionListener {
+class MyFrame : JFrame(), ActionListener {
+    private var resultScrollPane: JScrollPane
+    private val logger = Logger()
+    private var processTextArea: JTextArea
     private var zipFilePicker: ZipFilePicker
     private var startProcessButton: JButton
     private var sentEmailTextField: JTextField
@@ -23,9 +31,8 @@ internal class MyFrame : JFrame(), ActionListener {
     private val title: JLabel
 
     init {
-
         setTitle("Rocket")
-        setBounds(300, 90, 560, 600)
+        setBounds(300, 90, 560, 800)
         defaultCloseOperation = EXIT_ON_CLOSE
         isResizable = false
         c = contentPane
@@ -164,6 +171,21 @@ internal class MyFrame : JFrame(), ActionListener {
 //                            .updateShouldDeleteFilesAfterProcess(it.stateChange == 1)
                 }
 
+        processTextArea = JTextArea().apply {
+            font = Font("Arial", Font.PLAIN, 12)
+            isEditable = false
+            text = "Preencha as informações e clique em iniciar."
+        }
+
+        resultScrollPane = JScrollPane(processTextArea).apply {
+            size = Dimension(465, 280)
+            location = Point(START_X_FIRST_COLUMN, 470)
+        }.also {
+            c.add(it)
+        }
+
+
+
         startProcessButton = JButton("Iniciar")
                 .apply {
                     font = Font("Arial", Font.PLAIN, 14)
@@ -178,9 +200,42 @@ internal class MyFrame : JFrame(), ActionListener {
                                 .updateEmailAddressRecipient(sentEmailTextField.text)
                                 .updateTextToRemoveFileName(removeTextFromFilename.text)
                                 .updateQuantityFilesPerPackage(quantityFilesTextField.value as Int)
+
+                        logger.observe(object : Observer<String> {
+                            override fun onComplete() {}
+
+                            override fun onSubscribe(p0: Disposable) {
+                                processTextArea.text = ""
+                            }
+
+                            override fun onNext(message: String) {
+                                val actualContent = processTextArea.text
+                                if (actualContent.isEmpty()) {
+                                    processTextArea.text = actualContent + message
+                                } else {
+                                    processTextArea.text = actualContent + "\n" + message
+                                }
+
+                                resultScrollPane.verticalScrollBar.addAdjustmentListener { e ->
+                                    e?.let {
+                                        it.adjustable.value = it.adjustable.maximum
+                                    }
+                                }
+                            }
+
+                            override fun onError(p0: Throwable) {
+                                p0.printStackTrace()
+                            }
+
+                        })
+                        processTextArea.text = ""
+                        ProcessorManager().startProcess(logger)
                     }
                 }
 
+
+
+        setLocationRelativeTo(null)
         isVisible = true
     }
 

@@ -1,5 +1,6 @@
 package com.company.util
 
+import com.company.configuration.RocketConfiguration
 import java.util.*
 import javax.activation.DataHandler
 import javax.activation.FileDataSource
@@ -11,7 +12,10 @@ import javax.mail.internet.MimeMultipart
 
 class EmailManager {
 
-    fun execute(filepath: String, fileName: String, emailSubject: String) {
+    fun execute(logger: Logger, filepath: String, fileName: String, emailSubject: String) {
+        logger.log("\nPreparando e enviando o e-mail: $emailSubject")
+        val configuration = RocketConfiguration.instance()
+
         val props = Properties().apply {
             put("mail.smtp.host", "smtp.gmail.com");
             put("mail.smtp.socketFactory.port", "465");
@@ -24,19 +28,19 @@ class EmailManager {
         val session = Session.getDefaultInstance(props,
                 object : Authenticator() {
                     override fun getPasswordAuthentication(): PasswordAuthentication {
-                        return PasswordAuthentication("lx.felipemakimen@gmail.com",
-                                "Firefire1207")
+                        return PasswordAuthentication(configuration.emailAddressSender,
+                                CryptoManager.Decripto(configuration.passwordEmailSender))
                     }
                 })
 
         try {
 
             val message = MimeMessage(session);
-            message.setFrom(InternetAddress("lx.felipemakimen@gmail.com"));
+            message.setFrom(InternetAddress(configuration.emailAddressSender));
 
             //Remetente
             val toUser = InternetAddress //Destinatário(s)
-                    .parse("felipemakinen@hotmail.com, lx.felipemakimen@gmail.com");
+                    .parse(configuration.emailAddressRecipient);
 
             message.setRecipients(Message.RecipientType.TO, toUser);
             message.setSubject(emailSubject)
@@ -50,7 +54,6 @@ class EmailManager {
             multipart.addBodyPart(messageBodyPart)
             messageBodyPart.setDataHandler(DataHandler(source))
             messageBodyPart.setFileName(fileName)
-            multipart.addBodyPart(messageBodyPart)
 
             // Send the complete message parts
 
@@ -58,8 +61,51 @@ class EmailManager {
             message.setContent(multipart)
             Transport.send(message)
 
-            System.out.println("Feito!!!")
+            print("Feito!!! " + fileName)
+            logger.log("E-mail $emailSubject - Enviado. \n")
 
+        } catch (e: MessagingException) {
+            throw RuntimeException(e)
+        }
+    }
+
+    fun sendReport(report: String) {
+        val configuration = RocketConfiguration.instance()
+
+        val props = Properties().apply {
+            put("mail.smtp.host", "smtp.gmail.com");
+            put("mail.smtp.socketFactory.port", "465");
+            put("mail.smtp.socketFactory.class",
+                    "javax.net.ssl.SSLSocketFactory");
+            put("mail.smtp.auth", "true");
+            put("mail.smtp.port", "465");
+        }
+
+        val session = Session.getDefaultInstance(props,
+                object : Authenticator() {
+                    override fun getPasswordAuthentication(): PasswordAuthentication {
+                        return PasswordAuthentication(configuration.emailAddressSender,
+                                CryptoManager.Decripto(configuration.passwordEmailSender))
+                    }
+                })
+
+        try {
+
+            val message = MimeMessage(session);
+            message.setFrom(InternetAddress(configuration.emailAddressSender));
+
+            //Remetente
+            val toUser = InternetAddress //Destinatário(s)
+                    .parse(configuration.emailAddressSender);
+
+            message.setRecipients(Message.RecipientType.TO, toUser);
+            message.setSubject("Relatório Rocket - ${configuration.emailSubject}")
+            message.setText(report);
+            /**Método para enviar a mensagem criada*/
+
+            val messageBodyPart: BodyPart = MimeBodyPart()
+            messageBodyPart.setText(report)
+            Transport.send(message)
         } catch (e: MessagingException) {
             throw RuntimeException(e)
         }

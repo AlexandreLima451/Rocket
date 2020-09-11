@@ -4,6 +4,7 @@ import com.company.configuration.RocketConfiguration
 import java.io.*
 import java.time.LocalDateTime
 import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
@@ -43,10 +44,10 @@ class FileManager {
      * @param mFolderPath is the folder that will be deleted
      * @return the final result of the process
      */
-    private fun deleteFolder(mFolderPath : String) : String{
+    private fun deleteFolder(mFolderPath: String): String {
         val folder = File(mFolderPath)
 
-        if(!folder.isDirectory){
+        if (!folder.isDirectory) {
             return "The source path $mFolderPath is not a directory!"
         }
 
@@ -66,13 +67,13 @@ class FileManager {
      * @param mZipFileName is the name of .zip file
      * @return the absolute path of zip file
      */
-    private fun zipFolder(mSourcePath: String, mDestPath: String, mZipFileName : String) : String{
+    private fun zipFolder(mSourcePath: String, mDestPath: String, mZipFileName: String): String {
 
         val buffer = ByteArray(1024)
         val sourceDirectory = File(mSourcePath)
         val zipFileNameWithoutExtension = mZipFileName.replace(".zip", "")
 
-        if (!sourceDirectory.isDirectory){
+        if (!sourceDirectory.isDirectory) {
             return "The source path $mSourcePath is not a directory!"
         }
 
@@ -101,12 +102,12 @@ class FileManager {
 
             zipOut.closeEntry()
 
-        }catch (ioException : IOException){
+        } catch (ioException: IOException) {
             ioException.printStackTrace()
-        }finally {
+        } finally {
             try {
                 zipOut.close()
-            }catch (ex : IOException){
+            } catch (ex: IOException) {
                 ex.printStackTrace()
             }
         }
@@ -119,22 +120,28 @@ class FileManager {
      * @param mDestPath is the final folder where the files will be found after unzip
      * @return a list of files that were extracted
      */
-    fun unzipFolder(mSourcePath : String, mDestPath : String) : List<FileData> {
+    fun unzipFolder(mSourcePath: String, mDestPath: String): List<FileData> {
         val buffer = 1024
 
-        try{
+        try {
             val fileInputStream = FileInputStream(mSourcePath)
             val zipInputStream = ZipInputStream(BufferedInputStream(fileInputStream))
-            var zipEntry : ZipEntry?
+            var zipEntry: ZipEntry?
 
-            var fileOutputStream : FileOutputStream
-            var dest : BufferedOutputStream
+            var fileOutputStream: FileOutputStream
+            var dest: BufferedOutputStream
             var fileId = 0
             val listOfFileData = ArrayList<FileData>()
 
             zipEntry = zipInputStream.nextEntry
 
-            if(zipEntry != null) {
+            while (zipEntry != null && zipEntry.name.contains(".xml").not()) {
+                zipEntry = zipInputStream.nextEntry
+            }
+
+            if (zipEntry != null
+                    && zipEntry.name.contains(".xml")
+                    && zipEntry.name.contains("MAC").not()) {
                 var absoluteDestPath = mDestPath + File.separator + zipEntry.name
                 fileOutputStream = FileOutputStream(absoluteDestPath)
                 dest = BufferedOutputStream(fileOutputStream, buffer)
@@ -154,11 +161,11 @@ class FileManager {
                         dest.flush()
 
                         fileId++
-                        listOfFileData.add(FileData(fileId, absoluteDestPath, ArrayList()))
+                        listOfFileData.add(FileData(fileId, absoluteDestPath))
 
                         zipEntry = zipInputStream.nextEntry
 
-                        if (zipEntry != null) {
+                        if (zipEntry != null && zipEntry.name.contains("MAC").not()) {
                             absoluteDestPath = mDestPath + File.separator + zipEntry.name
                             fileOutputStream = FileOutputStream(absoluteDestPath)
                             dest = BufferedOutputStream(fileOutputStream, buffer)
@@ -172,10 +179,27 @@ class FileManager {
             }
 
             return listOfFileData
-        }catch (exc : IOException){
+        } catch (exc: IOException) {
             exc.printStackTrace()
             return ArrayList()
         }
+    }
+
+    fun unzipFolder2(mSourcePath: String, mDestPath: String): ExtractedFileData {
+        val listOfFileData = ArrayList<FileData>()
+        val zipFile = net.lingala.zip4j.ZipFile(mSourcePath)
+        zipFile.extractAll(mDestPath)
+        val items = zipFile.fileHeaders.filter { it.fileName.contains("MAC").not() && it.fileName.contains(".xml") }
+
+        for (i in items.indices) {
+            listOfFileData.add(
+                    FileData(
+                            i,
+                            mDestPath + File.separator + items[i].fileName
+                    )
+            )
+        }
+        return ExtractedFileData(mDestPath + File.separator, listOfFileData)
     }
 
     /**
@@ -183,10 +207,10 @@ class FileManager {
      * @param mSourcePath is the folder that will scanned
      * @return a list of files
      */
-    private fun listFilesByFolder(mSourcePath : String) : List<String> {
+    private fun listFilesByFolder(mSourcePath: String): List<String> {
         val listOfFiles = ArrayList<String>()
 
-        return try{
+        return try {
             val files = File(mSourcePath)
 
             files.listFiles()?.forEach {
@@ -194,7 +218,7 @@ class FileManager {
             }
 
             listOfFiles
-        }catch (exc : IOException){
+        } catch (exc: IOException) {
             exc.printStackTrace()
             ArrayList()
         }
@@ -211,8 +235,9 @@ class FileManager {
      */
     fun splitFiles(mSourcePath: String,
                    mDestPath: String,
-                   mFileExtension: String = ".rtf",
-                   mIsZipFolder : Boolean = true): List<FileData> {
+                   logger: Logger,
+                   mFileExtension: String = ".xml",
+                   mIsZipFolder: Boolean = true): List<FileData> {
 
         val configuration = RocketConfiguration.instance()
         val folder = File(mSourcePath.trim())
@@ -225,6 +250,7 @@ class FileManager {
         val destinyFolder = createFolder(mPath = mDestPath, mNewFolderName = rootFolderName)
 
         var destPathFolder = createFolder(destinyFolder.trim(), currentFolderName)
+        logger.log("Separando os arquivos XML - ${configuration.quantityFilesPerPackage} em cada pasta")
         for (file in files) {
             val fileName = file.name.replace(configuration.textToRemoveFilename, "")
             val destFilePath = destPathFolder + File.separator + fileName
@@ -246,13 +272,15 @@ class FileManager {
 
         var fileId = 0
 
-        if(mIsZipFolder){
+        if (mIsZipFolder) {
+            logger.log("Compactando os pacotes para enviar por e-mail")
             File(destinyFolder).listFiles()?.forEach {
-                if(it.isDirectory){
+                if (it.isDirectory) {
                     val listFilesByFolder = listFilesByFolder(it.absolutePath)
                     val absolutePathOfZipFile = zipFolder(mSourcePath = it.absolutePath, mDestPath = destinyFolder, mZipFileName = it.name)
                     deleteFolder(mFolderPath = it.absolutePath)
                     fileId++
+                    logger.log("Pacote $fileId compactado. Salvo no diretório: $absolutePathOfZipFile")
                     listOfFileData.add(FileData(fileId, absolutePathOfZipFile, listFilesByFolder))
 
                 }
