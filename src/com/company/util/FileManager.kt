@@ -1,12 +1,15 @@
 package com.company.util
 
 import com.company.configuration.RocketConfiguration
+import com.company.extensions.formatToTimeDefault
 import java.io.*
 import java.time.LocalDateTime
+import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlin.collections.ArrayList
 
 /**
  * Class that is responsible to manage files
@@ -30,7 +33,7 @@ class FileManager {
      * @return the absolute path of the new folder if it was created
      */
     private fun createFolder(mPath: String, mNewFolderName: String): String {
-        val completePath = "$mPath/$mNewFolderName"
+        val completePath = "$mPath${File.separator}$mNewFolderName"
         val isFolderCreated = File(completePath).mkdir()
         return if (isFolderCreated) {
             completePath
@@ -243,7 +246,7 @@ class FileManager {
         val folder = File(mSourcePath.trim())
         val files = folder.listFiles() ?: return ArrayList()
         var count = 0
-        val rootFolderName = "rocket " + LocalDateTime.now()
+        val rootFolderName = "rocket_" + Date().time.toString()
         var currentFolderName = DEFAULT_FOLDER_NAME
         val listOfFileData = ArrayList<FileData>()
 
